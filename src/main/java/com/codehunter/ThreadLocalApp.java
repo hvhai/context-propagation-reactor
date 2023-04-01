@@ -13,9 +13,14 @@ public class ThreadLocalApp
     public static void main( String[] args )
     {
         ThreadLocalApp app = new ThreadLocalApp();
+        // 1. Thread local
         app.handleRequest();
-        app.handleRequestAsync();
-        app.handleRequestAsync().join();
+        // 2. Async
+//        app.handleRequestAsync();
+//        app.handleRequestAsync().join();
+        // 3. Wrap async
+        app.handleRequestByWrapper();
+        app.handleRequestByWrapper().join();
 
     }
     static long correlationId() {
@@ -51,5 +56,34 @@ public class ThreadLocalApp
         return CompletableFuture
                 .runAsync(() -> addProduct("product-1"))
                 .thenRunAsync(()-> notifyShop("product-1"));
+    }
+
+    CompletableFuture<Void> handleRequestByWrapper() {
+        return CompletableFuture
+                .runAsync(new WrappedRunnable(
+                        () -> addProduct("test-product")))
+                .thenRunAsync(new WrappedRunnable(
+                        () -> notifyShop("test-product")));
+    }
+    public class WrappedRunnable implements Runnable{
+        private final Long correlationId;
+        private final Runnable wrapped;
+
+        public WrappedRunnable(Runnable wrapped) {
+            this.correlationId = CORRELATION_ID.get();
+            this.wrapped = wrapped;
+        }
+
+        @Override
+        public void run() {
+            Long old = CORRELATION_ID.get();
+            CORRELATION_ID.set(this.correlationId);
+            try {
+                wrapped.run();
+            } finally {
+                CORRELATION_ID.set(old);
+            }
+
+        }
     }
 }
