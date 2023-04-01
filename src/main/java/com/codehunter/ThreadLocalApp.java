@@ -1,6 +1,8 @@
 package com.codehunter;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -19,8 +21,12 @@ public class ThreadLocalApp
 //        app.handleRequestAsync();
 //        app.handleRequestAsync().join();
         // 3. Wrap async
-        app.handleRequestByWrapper();
-        app.handleRequestByWrapper().join();
+//        app.handleRequestByWrapper();
+//        app.handleRequestByWrapper().join();
+        // 4. Wrap runnable
+        Executor executor = new WrappedExecutor(ForkJoinPool.commonPool());
+        handleRequest(executor);
+
 
     }
     static long correlationId() {
@@ -42,12 +48,12 @@ public class ThreadLocalApp
         notifyShop("product-1");
     }
 
-    void addProduct(String productName) {
+    static void addProduct(String productName) {
         log("Adding product: " + productName);
         // ...
     }
 
-    void notifyShop(String productName) {
+    static void notifyShop(String productName) {
         log("Notifying shop about: " + productName);
         // ...
     }
@@ -65,7 +71,14 @@ public class ThreadLocalApp
                 .thenRunAsync(new WrappedRunnable(
                         () -> notifyShop("test-product")));
     }
-    public class WrappedRunnable implements Runnable{
+
+
+    static CompletableFuture<Void> handleRequest(Executor executor) {
+        return CompletableFuture
+                .runAsync(() -> addProduct("test-product"), executor)
+                .thenRunAsync(() -> notifyShop("test-product"), executor);
+    }
+     static class WrappedRunnable implements Runnable{
         private final Long correlationId;
         private final Runnable wrapped;
 
@@ -84,6 +97,20 @@ public class ThreadLocalApp
                 CORRELATION_ID.set(old);
             }
 
+        }
+    }
+
+     static class WrappedExecutor implements Executor {
+
+        private final Executor actual;
+
+        WrappedExecutor(Executor actual) {
+            this.actual = actual;
+        }
+
+        @Override
+        public void execute(Runnable command) {
+            actual.execute(new WrappedRunnable(command));
         }
     }
 }
