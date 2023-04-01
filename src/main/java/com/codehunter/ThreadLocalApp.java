@@ -1,5 +1,6 @@
 package com.codehunter;
 
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -13,6 +14,9 @@ public class ThreadLocalApp
     {
         ThreadLocalApp app = new ThreadLocalApp();
         app.handleRequest();
+        app.handleRequestAsync();
+        app.handleRequestAsync().join();
+
     }
     static long correlationId() {
         return Math.abs(ThreadLocalRandom.current().nextLong());
@@ -41,5 +45,11 @@ public class ThreadLocalApp
     void notifyShop(String productName) {
         log("Notifying shop about: " + productName);
         // ...
+    }
+
+    CompletableFuture<Void> handleRequestAsync() {
+        return CompletableFuture
+                .runAsync(() -> addProduct("product-1"))
+                .thenRunAsync(()-> notifyShop("product-1"));
     }
 }
